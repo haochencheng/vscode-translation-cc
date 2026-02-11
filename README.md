@@ -25,6 +25,8 @@
 
 Search for `Translate-selected` in the VS Code Extensions Marketplace and click **Install**.
 
+- Or download directly from the VS Code Marketplace: [Translate-selected on Marketplace](https://marketplace.visualstudio.com/items?itemName=CliffHao.translate-selected) （可通过此链接下载插件）
+
 ### 🚀 Usage
 
 #### Translate Selected Text
