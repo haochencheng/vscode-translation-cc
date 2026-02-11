@@ -44,7 +44,7 @@ Search for `Translate-selected` in the VS Code Extensions Marketplace and click 
 2. Type **"Translate Input"**
 3. Enter the text you want to translate in the input box
 4. The translation appears inline at the cursor position
-
+≤
 ### ⌨️ Keyboard Shortcuts
 
 | Shortcut | Platform | Command |
@@ -189,6 +189,30 @@ Chinese (Simplified), Chinese (Traditional), English, Japanese, Korean, French, 
 | **有道** | [ai.youdao.com](https://ai.youdao.com/) | 使用 v3 签名，语言代码自动映射（如 `zh-CN` → `zh-CHS`） |
 
 ---
+
+### 🔑 配置 DeepL API Key（常见错误："DeepL API key is not configured"）
+
+如果你看到错误提示 `DeepL API key is not configured`，请按下面任一方式添加你的 DeepL API Key：
+
+1. 通过 `settings.json` 添加（适合希望直接编辑配置的用户）：
+
+   - 打开命令面板（`Cmd+Shift+P`），输入 `Preferences: Open Settings (JSON)` 并回车，或者在设置界面（`Cmd+,`）中点击右上角的打开 JSON 图标。
+   - 在打开的 `settings.json` 中加入（替换为你的实际 API Key）：
+
+```json
+    "translate-selected.provider": "deepl",
+    "translate-selected.deepl.apiKey": "YOUR_DEEPL_API_KEY"
+```
+
+2. 通过设置 UI 添加（适合不想编辑 JSON 的用户）：
+
+   - 打开设置（`Cmd+,`），在搜索框输入 `Translate-selected`。
+   - 找到 `DeepL: Api Key`（或 `translate-selected.deepl.apiKey`），将你的 API Key 粘贴到对应输入框并保存。
+
+完成配置后，保存设置并重载 VS Code 窗口（`Cmd+Shift+P` → 输入 `Developer: Reload Window`），然后重试翻译命令。
+
+提示：如果你使用 DeepL Pro，请同时将 `translate-selected.deepl.apiUrl` 改为 `https://api.deepl.com/v2/translate`。
+
 
 ## �️ Development / 开发指南
 
