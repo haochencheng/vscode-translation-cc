@@ -3,7 +3,9 @@
 src/**
 .gitignore
 tsconfig.json
+esbuild.js
 **/*.ts
 **/*.map
 node_modules/**
 .DS_Store
+*.vsix

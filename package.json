@@ -2,7 +2,7 @@
   "name": "translate-selected",
   "displayName": "Translate-selected",
   "description": "Translate selected text with Google/DeepL/Youdao providers.",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "publisher": "CliffHao",
   "license": "MIT",
   "repository": {
@@ -260,13 +260,14 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
+    "dev": "node esbuild.js --watch",
+    "compile": "node esbuild.js --production",
     "lint": "echo \"No lint configured\""
   },
   "devDependencies": {
     "@types/node": "^20.11.30",
     "@types/vscode": "^1.85.0",
+    "esbuild": "^0.27.3",
     "typescript": "^5.4.2"
   },
   "dependencies": {

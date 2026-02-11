@@ -190,7 +190,65 @@ Chinese (Simplified), Chinese (Traditional), English, Japanese, Korean, French, 
 
 ---
 
-## 📄 License
+## �️ Development / 开发指南
+
+### Prerequisites / 前置要求
+
+- Node.js >= 18
+- npm >= 9
+
+### Setup / 环境搭建
+
+```bash
+# Clone the repository / 克隆仓库
+git clone https://github.com/cliff/vscode-translation-cc.git
+cd vscode-translation-cc
+
+# Install dependencies / 安装依赖
+npm install
+```
+
+### Scripts / 脚本说明
+
+| Command / 命令 | Description / 说明 |
+|---|---|
+| `npm run dev` | Start development mode with watch (开发模式，自动监听文件变化) |
+| `npm run compile` | Build production bundle (构建生产版本) |
+
+### Development Workflow / 开发流程
+
+1. **Start dev mode / 启动开发模式**
+   ```bash
+   npm run dev
+   ```
+   This watches for file changes and rebuilds automatically.
+   自动监听文件变化并重新构建。
+
+2. **Debug in VS Code / 在 VS Code 中调试**
+   - Press `F5` to launch Extension Development Host
+   - 按 `F5` 启动扩展开发宿主
+
+3. **Build for production / 构建生产版本**
+   ```bash
+   npm run compile
+   ```
+
+### Publishing / 发布
+
+```bash
+# Update version / 更新版本号
+npm version patch  # or minor / major
+
+# Package vsix / 打包 vsix
+npx vsce package
+
+# Publish to marketplace / 发布到市场
+npx vsce publish
+```
+
+---
+
+## �📄 License
 
 MIT
 
