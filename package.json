@@ -7,9 +7,9 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cliff/vscode-translation-cc"
+    "url": "https://github.com/haochencheng/vscode-translation-cc"
   },
-  "homepage": "https://github.com/cliff/vscode-translation-cc#readme",
+  "homepage": "https://github.com/haochencheng/vscode-translation-cc#readme",
   "engines": {
     "vscode": "^1.85.0"
   },
