@@ -22,7 +22,7 @@
     "onCommand:extension.translateText"
   ],
   "main": "./out/extension.js",
-  "icon": "images/icon.svg",
+  "icon": "images/icon.png",
   "contributes": {
     "commands": [
       {
@@ -269,6 +269,7 @@
     "@types/node": "^20.11.30",
     "@types/vscode": "^1.85.0",
     "esbuild": "^0.27.3",
+    "pngjs": "^7.0.0",
     "typescript": "^5.4.2"
   },
   "dependencies": {
