@@ -2,7 +2,7 @@
   "name": "translate-selected",
   "displayName": "Translate-selected",
   "description": "Translate selected text with Google/DeepL/Youdao providers.",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "publisher": "CliffHao",
   "license": "MIT",
   "repository": {
