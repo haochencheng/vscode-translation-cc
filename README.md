@@ -194,4 +194,4 @@ MIT
 
 ## 🙏 Acknowledgement
 
-Inspired by other translation extensions in the VS Code ecosystem.
+- 源码地址: https://github.com/haochencheng/vscode-translation-cc.git
