@@ -372,12 +372,13 @@ export function activate(context: vscode.ExtensionContext): void {
     const translatedLines = translated.replace(/\r\n/g, "\n").split("\n");
     const lineCount = originalLines.length;
 
-    // Find the longest translated line to determine uniform width
+    // Prefix first line with translation indicator; align subsequent lines
     let maxLen = 0;
     const paddedLines: string[] = [];
     for (let i = 0; i < lineCount; i++) {
       const line = translatedLines[i] || "";
-      const displayLine = ` ${line} `;
+      const prefix = i === 0 ? " 🌐  " : "     ";
+      const displayLine = `${prefix}${line}  `;
       paddedLines.push(displayLine);
       if (displayLine.length > maxLen) {
         maxLen = displayLine.length;
@@ -393,31 +394,37 @@ export function activate(context: vscode.ExtensionContext): void {
     });
 
     const decorations: vscode.DecorationOptions[] = [];
-    
-    // Create per-line decorations to ensure precise line mapping and block appearance
+
+    // Create per-line decorations with polished card appearance
     for (let i = 0; i < lineCount; i++) {
       const lineNum = range.start.line + i;
       const anchorPos = new vscode.Position(lineNum, 0);
       const anchorRange = new vscode.Range(anchorPos, anchorPos);
 
-      // Border styling logic for block appearance
       const isTop = (i === 0);
       const isBottom = (i === lineCount - 1);
-      const radius = `${isTop ? "4px" : "0"} ${isTop ? "4px" : "0"} ${isBottom ? "4px" : "0"} ${isBottom ? "4px" : "0"}`;
-      const borderTop = isTop ? "1px solid #569cd6" : "none";
-      const borderBottom = isBottom ? "1px solid #569cd6" : "none";
-      const borderSide = "1px solid #569cd6";
-      
+      const radiusTL = isTop ? "6px" : "0";
+      const radiusTR = isTop ? "6px" : "0";
+      const radiusBR = isBottom ? "6px" : "0";
+      const radiusBL = isBottom ? "6px" : "0";
+      const borderTop = isTop ? "1px solid rgba(86,156,214,0.35)" : "none";
+      const borderBottom = isBottom ? "1px solid rgba(86,156,214,0.35)" : "none";
+      const borderRight = "1px solid rgba(86,156,214,0.25)";
+      // Blue accent bar on the left (like GitLens annotations)
+      const borderLeft = "3px solid #569cd6";
+
       // Calculate transform: move up by (TotalLineCount * 100%) + 30px
       const transformY = `calc(-1 * (${lineCount} * 100% + 30px))`;
 
       const decorationStyle =
-        `border-radius: ${radius}; ` +
-        `padding: 0 4px; ` +
-        `border-top: ${borderTop}; border-bottom: ${borderBottom}; border-left: ${borderSide}; border-right: ${borderSide}; ` +
+        `border-radius: ${radiusTL} ${radiusTR} ${radiusBR} ${radiusBL}; ` +
+        `padding: 2px 12px 2px 4px; ` +
+        `border-top: ${borderTop}; border-bottom: ${borderBottom}; ` +
+        `border-left: ${borderLeft}; border-right: ${borderRight}; ` +
         "font-style: normal; font-weight: 400; " +
-        "line-height: inherit; font-size: inherit; font-family: inherit; " +
-        "box-shadow: 0 6px 14px rgba(0,0,0,0.45); " +
+        "line-height: 1.65; font-size: inherit; font-family: inherit; " +
+        "letter-spacing: 0.2px; " +
+        "box-shadow: 0 8px 24px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.3); " +
         `position: absolute; display: inline-block; white-space: pre; ` +
         `transform: translateY(${transformY}); height: 100%; box-sizing: border-box;`;
 
@@ -426,8 +433,8 @@ export function activate(context: vscode.ExtensionContext): void {
         renderOptions: {
           before: {
             contentText: uniformLines[i],
-            backgroundColor: "#000000",
-            color: "#e6e6e6",
+            backgroundColor: "#1c2333",
+            color: "#d4d4d4",
             textDecoration: decorationStyle
           }
         }
