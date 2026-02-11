@@ -1,13 +1,15 @@
 import * as vscode from "vscode";
 import axios from "axios";
-import crypto from "crypto";
+import * as crypto from "crypto";
+
+console.log("Translation-selected: File loaded");
 
 interface Translator {
   translate(text: string, source: string, target: string): Promise<string>;
 }
 
 class GoogleTranslator implements Translator {
-  constructor(private apiKey: string) {}
+  constructor(private readonly apiKey: string) {}
 
   async translate(text: string, source: string, target: string): Promise<string> {
     if (!this.apiKey) {
@@ -40,26 +42,29 @@ class GoogleTranslator implements Translator {
 }
 
 class DeepLTranslator implements Translator {
-  constructor(private apiKey: string, private apiUrl: string) {}
+  constructor(private readonly apiKey: string, private readonly apiUrl: string) {}
 
   async translate(text: string, source: string, target: string): Promise<string> {
     if (!this.apiKey) {
       throw new Error("DeepL API key is not configured.");
     }
 
-    const params: Record<string, string> = {
-      text,
-      target_lang: target
+    // DeepL uses uppercase language codes and specific formats
+    const targetLang = this.mapLanguageCode(target);
+
+    const body: Record<string, unknown> = {
+      text: [text],
+      target_lang: targetLang
     };
 
     if (source && source !== "auto") {
-      params.source_lang = source;
+      body.source_lang = this.mapLanguageCode(source);
     }
 
-    const response = await axios.post(this.apiUrl, new URLSearchParams(params), {
+    const response = await axios.post(this.apiUrl, body, {
       headers: {
         Authorization: `DeepL-Auth-Key ${this.apiKey}`,
-        "Content-Type": "application/x-www-form-urlencoded"
+        "Content-Type": "application/json"
       }
     });
 
@@ -70,10 +75,54 @@ class DeepLTranslator implements Translator {
 
     return translated;
   }
+
+  private mapLanguageCode(code: string): string {
+    // DeepL uses uppercase codes with specific mappings
+    const map: Record<string, string> = {
+      "zh-cn": "ZH-HANS",
+      "zh-tw": "ZH-HANT",
+      "en": "EN",
+      "en-us": "EN-US",
+      "en-gb": "EN-GB",
+      "pt": "PT-PT",
+      "pt-br": "PT-BR",
+      "nb": "NB",
+    };
+    const lower = code.toLowerCase();
+    return map[lower] || code.split("-")[0].toUpperCase();
+  }
 }
 
 class YoudaoTranslator implements Translator {
-  constructor(private appKey: string, private appSecret: string) {}
+  constructor(private readonly appKey: string, private readonly appSecret: string) {}
+
+  private mapLanguageCode(code: string): string {
+    // Youdao uses specific language codes
+    const map: Record<string, string> = {
+      "zh-cn": "zh-CHS",
+      "zh-tw": "zh-CHT",
+      "en": "en",
+      "ja": "ja",
+      "ko": "ko",
+      "fr": "fr",
+      "de": "de",
+      "es": "es",
+      "pt": "pt",
+      "pt-br": "pt",
+      "ru": "ru",
+      "it": "it",
+      "nl": "nl",
+      "pl": "pl",
+      "ar": "ar",
+      "th": "th",
+      "vi": "vi",
+      "id": "id",
+      "ms": "ms",
+      "tr": "tr",
+    };
+    const lower = code.toLowerCase();
+    return map[lower] || code.toLowerCase();
+  }
 
   async translate(text: string, source: string, target: string): Promise<string> {
     if (!this.appKey || !this.appSecret) {
@@ -88,8 +137,8 @@ class YoudaoTranslator implements Translator {
 
     const params = new URLSearchParams({
       q: text,
-      from: source || "auto",
-      to: target,
+      from: source === "auto" ? "auto" : this.mapLanguageCode(source),
+      to: this.mapLanguageCode(target),
       appKey: this.appKey,
       salt,
       sign,
@@ -140,49 +189,344 @@ function getTranslator(config: vscode.WorkspaceConfiguration): Translator {
   return new GoogleTranslator(apiKey);
 }
 
-async function translateAndShow(text: string): Promise<void> {
-  const config = vscode.workspace.getConfiguration("translation-cc");
+type Logger = (message: string) => void;
+
+async function translateText(text: string, log: Logger): Promise<string> {
+  const config = vscode.workspace.getConfiguration("translate-selected");
   const source = config.get<string>("sourceLanguage", "auto");
   const target = config.get<string>("targetLanguage", "zh-CN");
   const translator = getTranslator(config);
+  const provider = config.get<string>("provider", "google");
 
-  await vscode.window.withProgress(
+  log(`Translate start | provider=${provider} source=${source} target=${target}`);
+  log(`Text length=${text.length} preview="${formatPreview(text)}"`);
+
+  return vscode.window.withProgress(
     {
       location: vscode.ProgressLocation.Notification,
       title: "Translating...",
       cancellable: false
     },
     async () => {
-      const translated = await translator.translate(text, source, target);
-      await vscode.window.showInformationMessage(translated, { modal: true });
+      // Split text by newlines to preserve line structure
+      const lines = text.split("\n");
+      // If single line, translate directly to save requests
+      if (lines.length === 1) {
+        const translated = await translator.translate(text, source, target);
+        log(`Translate success | length=${translated.length}`);
+        return translated;
+      }
+
+      // If multiple lines, translate line-by-line to maintain 1-to-1 mapping
+      const translatedLines = await Promise.all(
+        lines.map(async (line) => {
+          if (!line.trim()) {
+            return "";
+          }
+          try {
+            return await translator.translate(line, source, target);
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            log(`Line translation failed: "${line.substring(0, 30)}" error=${msg}`);
+            throw e; // Propagate error instead of silently returning original
+          }
+        })
+      );
+
+      const result = translatedLines.join("\n");
+      log(`Translate success (multi-line) | lines=${lines.length} total_length=${result.length}`);
+      return result;
     }
   );
 }
 
-export function activate(context: vscode.ExtensionContext): void {
-  const translateSelection = vscode.commands.registerCommand(
-    "translation-cc.translateSelection",
-    async () => {
-      const editor = vscode.window.activeTextEditor;
-      const selectionText = editor?.document.getText(editor.selection).trim();
+function formatInlineText(
+  text: string,
+  originalLineCount: number
+): { displayText: string; lineCount: number; collapsed: boolean } {
+  // Format translation to match original text line count
+  const translatedLines = text.replace(/\r\n/g, "\n").split("\n");
+  
+  // Use original text line count for positioning
+  const lineCount = originalLineCount;
 
-      if (!selectionText) {
-        vscode.window.showWarningMessage("No text selected.");
+  return {
+    displayText: translatedLines.join("\n"),
+    lineCount,
+    collapsed: false
+  };
+}
+
+function getWrapColumns(editor: vscode.TextEditor): number {
+  const visible = editor.visibleRanges[0];
+  if (!visible) {
+    return 80;
+  }
+
+  const maxLine = Math.max(visible.start.line, visible.end.line);
+  let maxCols = 0;
+  for (let line = visible.start.line; line <= maxLine; line += 1) {
+    const text = editor.document.lineAt(line).text;
+    maxCols = Math.max(maxCols, text.length);
+  }
+
+  return Math.max(40, Math.min(120, maxCols || 80));
+}
+
+function getMaxLines(editor: vscode.TextEditor): number {
+  const visible = editor.visibleRanges[0];
+  if (!visible) {
+    return 6;
+  }
+
+  const visibleLines = Math.max(1, visible.end.line - visible.start.line + 1);
+  return Math.max(3, Math.min(10, Math.floor(visibleLines * 0.35)));
+}
+
+function wrapLineWithIndent(line: string, maxCols: number): string[] {
+  if (!line) {
+    return [""];
+  }
+
+  const match = line.match(/^(\s+)/);
+  const indent = match ? match[1] : "";
+  const content = indent ? line.slice(indent.length) : line;
+  const available = Math.max(10, maxCols - indent.length);
+  const result: string[] = [];
+
+  if (content.length <= available) {
+    return [line];
+  }
+
+  let remaining = content;
+  let isFirst = true;
+  while (remaining.length > 0) {
+    const chunk = remaining.slice(0, available);
+    remaining = remaining.slice(available);
+    result.push(isFirst ? `${indent}${chunk}` : `${indent}${chunk}`);
+    isFirst = false;
+  }
+
+  return result;
+}
+
+function formatPreview(text: string): string {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (normalized.length <= 80) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, 80)}...`;
+}
+
+function formatError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.stack || error.message;
+  }
+
+  return String(error);
+}
+
+export function activate(context: vscode.ExtensionContext): void {
+  console.log('Congratulations, your extension "translate-selected" is now active!');
+  vscode.window.showInformationMessage("Extension 'Translate-selected' is now active!");
+  const outputChannel = vscode.window.createOutputChannel("Translation CC");
+  const log: Logger = (message: string) => {
+    const time = new Date().toISOString();
+    outputChannel.appendLine(`[${time}] ${message}`);
+  };
+  const decorationType = vscode.window.createTextEditorDecorationType({});
+  let decorationTimer: NodeJS.Timeout | undefined;
+  let displayTime: number | undefined;
+  let activeDecoration:
+    | { editor: vscode.TextEditor; range: vscode.Range; selection: vscode.Selection }
+    | undefined;
+
+  const clearInlineTranslation = (reason: string): void => {
+    if (!activeDecoration) {
+      return;
+    }
+
+    activeDecoration.editor.setDecorations(decorationType, []);
+    activeDecoration = undefined;
+    displayTime = undefined;
+
+    if (decorationTimer) {
+      clearTimeout(decorationTimer);
+      decorationTimer = undefined;
+    }
+
+    log(`Inline translation cleared | reason=${reason}`);
+  };
+
+  const isSameSelection = (a: vscode.Selection, b: vscode.Selection): boolean =>
+    a.active.isEqual(b.active) && a.anchor.isEqual(b.anchor);
+
+  const showInlineTranslation = (
+    editor: vscode.TextEditor,
+    range: vscode.Range,
+    originalText: string,
+    translated: string
+  ): void => {
+    const originalLines = originalText.replace(/\r\n/g, "\n").split("\n");
+    const translatedLines = translated.replace(/\r\n/g, "\n").split("\n");
+    const lineCount = originalLines.length;
+
+    // Find the longest translated line to determine uniform width
+    let maxLen = 0;
+    const paddedLines: string[] = [];
+    for (let i = 0; i < lineCount; i++) {
+      const line = translatedLines[i] || "";
+      const displayLine = ` ${line} `;
+      paddedLines.push(displayLine);
+      if (displayLine.length > maxLen) {
+        maxLen = displayLine.length;
+      }
+    }
+
+    // Pad all lines to the same length for a uniform rectangle
+    const uniformLines = paddedLines.map((line) => {
+      if (line.trim() === "") {
+        return " ".repeat(maxLen);
+      }
+      return line + " ".repeat(Math.max(0, maxLen - line.length));
+    });
+
+    const decorations: vscode.DecorationOptions[] = [];
+    
+    // Create per-line decorations to ensure precise line mapping and block appearance
+    for (let i = 0; i < lineCount; i++) {
+      const lineNum = range.start.line + i;
+      const anchorPos = new vscode.Position(lineNum, 0);
+      const anchorRange = new vscode.Range(anchorPos, anchorPos);
+
+      // Border styling logic for block appearance
+      const isTop = (i === 0);
+      const isBottom = (i === lineCount - 1);
+      const radius = `${isTop ? "4px" : "0"} ${isTop ? "4px" : "0"} ${isBottom ? "4px" : "0"} ${isBottom ? "4px" : "0"}`;
+      const borderTop = isTop ? "1px solid #569cd6" : "none";
+      const borderBottom = isBottom ? "1px solid #569cd6" : "none";
+      const borderSide = "1px solid #569cd6";
+      
+      // Calculate transform: move up by (TotalLineCount * 100%) + 30px
+      const transformY = `calc(-1 * (${lineCount} * 100% + 30px))`;
+
+      const decorationStyle =
+        `border-radius: ${radius}; ` +
+        `padding: 0 4px; ` +
+        `border-top: ${borderTop}; border-bottom: ${borderBottom}; border-left: ${borderSide}; border-right: ${borderSide}; ` +
+        "font-style: normal; font-weight: 400; " +
+        "line-height: inherit; font-size: inherit; font-family: inherit; " +
+        "box-shadow: 0 6px 14px rgba(0,0,0,0.45); " +
+        `position: absolute; display: inline-block; white-space: pre; ` +
+        `transform: translateY(${transformY}); height: 100%; box-sizing: border-box;`;
+
+      decorations.push({
+        range: anchorRange,
+        renderOptions: {
+          before: {
+            contentText: uniformLines[i],
+            backgroundColor: "#000000",
+            color: "#e6e6e6",
+            textDecoration: decorationStyle
+          }
+        }
+      });
+    }
+
+    editor.setDecorations(decorationType, decorations);
+    activeDecoration = { editor, range, selection: editor.selection };
+    displayTime = Date.now();
+    log(
+      `Inline translation displayed | anchor=${range.start.line}:${range.start.character} lines=${lineCount} collapsed=false`
+    );
+
+    if (decorationTimer) {
+      clearTimeout(decorationTimer);
+    }
+
+    decorationTimer = setTimeout(() => {
+      clearInlineTranslation("timeout");
+    }, 8000);
+  };
+
+  context.subscriptions.push(
+    vscode.window.onDidChangeTextEditorSelection((event) => {
+      if (!activeDecoration) {
         return;
       }
 
-      try {
-        await translateAndShow(selectionText);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        vscode.window.showErrorMessage(message);
+      // Protection period: ignore selection changes within 500ms of display
+      if (displayTime && Date.now() - displayTime < 500) {
+        return;
       }
+
+      if (event.textEditor !== activeDecoration.editor) {
+        clearInlineTranslation("selection-change-editor");
+        return;
+      }
+
+      if (!isSameSelection(event.selections[0], activeDecoration.selection)) {
+        clearInlineTranslation("selection-change");
+      }
+    }),
+    vscode.window.onDidChangeActiveTextEditor(() => {
+      clearInlineTranslation("active-editor-change");
+    }),
+    vscode.workspace.onDidChangeTextDocument((event) => {
+      if (!activeDecoration) {
+        return;
+      }
+
+      if (event.document === activeDecoration.editor.document) {
+        clearInlineTranslation("text-input");
+      }
+    })
+  );
+
+  const runTranslateSelection = async (): Promise<void> => {
+    outputChannel.show(true);
+    log("Translate Selection invoked.");
+    const editor = vscode.window.activeTextEditor;
+    const selectionText = editor?.document.getText(editor.selection).trim();
+
+    if (!selectionText) {
+      vscode.window.showWarningMessage("No text selected.");
+      return;
     }
+
+    try {
+      const translated = await translateText(selectionText, log);
+      log(`Translate Selection translated | length=${translated.length}`);
+      if (editor) {
+        const range = editor.selection.isEmpty
+          ? new vscode.Range(editor.selection.active, editor.selection.active)
+          : editor.selection;
+        showInlineTranslation(editor, range, selectionText, translated);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      log("Translate Selection failed.");
+      log(formatError(error));
+      vscode.window.showErrorMessage(message);
+    }
+  };
+
+  const translateSelection = vscode.commands.registerCommand(
+    "translate-selected.translateSelection",
+    runTranslateSelection
+  );
+
+  const translateSelectionAlias = vscode.commands.registerCommand(
+    "extension.translateText",
+    runTranslateSelection
   );
 
   const translateInput = vscode.commands.registerCommand(
-    "translation-cc.translateInput",
+    "translate-selected.translateInput",
     async () => {
+      outputChannel.show(true);
+      log("Translate Input invoked.");
       const input = await vscode.window.showInputBox({
         prompt: "Enter text to translate",
         ignoreFocusOut: true
@@ -193,15 +537,33 @@ export function activate(context: vscode.ExtensionContext): void {
       }
 
       try {
-        await translateAndShow(input);
+        const translated = await translateText(input, log);
+
+        const editor = vscode.window.activeTextEditor;
+        if (editor) {
+          const range = new vscode.Range(editor.selection.active, editor.selection.active);
+          showInlineTranslation(editor, range, input, translated);
+        } else {
+          vscode.window.setStatusBarMessage(translated, 8000);
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown error";
+        log("Translate Input failed.");
+        log(formatError(error));
         vscode.window.showErrorMessage(message);
       }
     }
   );
 
-  context.subscriptions.push(translateSelection, translateInput);
+  context.subscriptions.push(
+    outputChannel,
+    decorationType,
+    translateSelection,
+    translateSelectionAlias,
+    translateInput
+  );
 }
 
-export function deactivate(): void {}
+export function deactivate(): void {
+  void 0;
+}
