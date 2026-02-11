@@ -1,0 +1,105 @@
+{
+  "name": "vscode-translation-cc",
+  "displayName": "Translation CC",
+  "description": "Translate selected text with Google/DeepL/Youdao providers.",
+  "version": "0.0.1",
+  "publisher": "your-name",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:translation-cc.translateSelection",
+    "onCommand:translation-cc.translateInput"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "translation-cc.translateSelection",
+        "title": "Translate Selection"
+      },
+      {
+        "command": "translation-cc.translateInput",
+        "title": "Translate Input"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "translation-cc.translateSelection",
+        "key": "ctrl+shift+t",
+        "when": "editorTextFocus"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "translation-cc.translateSelection",
+          "when": "editorHasSelection"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Translation CC",
+      "properties": {
+        "translation-cc.provider": {
+          "type": "string",
+          "enum": ["google", "deepl", "youdao"],
+          "default": "google",
+          "description": "Translation provider to use."
+        },
+        "translation-cc.sourceLanguage": {
+          "type": "string",
+          "default": "auto",
+          "description": "Source language (use 'auto' to detect)."
+        },
+        "translation-cc.targetLanguage": {
+          "type": "string",
+          "default": "zh-CN",
+          "description": "Target language code."
+        },
+        "translation-cc.google.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Google Translation API key."
+        },
+        "translation-cc.deepl.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "DeepL API key."
+        },
+        "translation-cc.deepl.apiUrl": {
+          "type": "string",
+          "default": "https://api-free.deepl.com/v2/translate",
+          "description": "DeepL API endpoint. Use https://api.deepl.com/v2/translate for Pro."
+        },
+        "translation-cc.youdao.appKey": {
+          "type": "string",
+          "default": "",
+          "description": "Youdao appKey."
+        },
+        "translation-cc.youdao.appSecret": {
+          "type": "string",
+          "default": "",
+          "description": "Youdao appSecret."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "echo \"No lint configured\""
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.4.2"
+  },
+  "dependencies": {
+    "axios": "^1.6.7"
+  }
+}
