@@ -2,10 +2,16 @@
   "name": "translate-selected",
   "displayName": "Translate-selected",
   "description": "Translate selected text with Google/DeepL/Youdao providers.",
-  "version": "0.0.1",
-  "publisher": "cliff",
+  "version": "1.0.0",
+  "publisher": "CliffHao",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cliff/vscode-translation-cc"
+  },
+  "homepage": "https://github.com/cliff/vscode-translation-cc#readme",
   "engines": {
-    "vscode": "^1.75.0"
+    "vscode": "^1.85.0"
   },
   "categories": [
     "Other"
