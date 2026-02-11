@@ -372,30 +372,65 @@ export function activate(context: vscode.ExtensionContext): void {
     const translatedLines = translated.replace(/\r\n/g, "\n").split("\n");
     const lineCount = originalLines.length;
 
-    // Prefix first line with translation indicator; align subsequent lines
-    let maxLen = 0;
-    const paddedLines: string[] = [];
+    // Visual width: CJK / fullwidth / emoji = 2 cols, others = 1 col
+    const visualWidth = (str: string): number => {
+      let w = 0;
+      for (const ch of str) {
+        const cp = ch.codePointAt(0) ?? 0;
+        if (
+          (cp >= 0x1100 && cp <= 0x115F) ||
+          (cp >= 0x2E80 && cp <= 0x303E) ||
+          (cp >= 0x3040 && cp <= 0x33BF) ||
+          (cp >= 0x3400 && cp <= 0x4DBF) ||
+          (cp >= 0x4E00 && cp <= 0x9FFF) ||
+          (cp >= 0xA000 && cp <= 0xA4CF) ||
+          (cp >= 0xAC00 && cp <= 0xD7AF) ||
+          (cp >= 0xF900 && cp <= 0xFAFF) ||
+          (cp >= 0xFE30 && cp <= 0xFE6F) ||
+          (cp >= 0xFF01 && cp <= 0xFF60) ||
+          (cp >= 0xFFE0 && cp <= 0xFFE6) ||
+          (cp >= 0x20000 && cp <= 0x2FA1F) ||
+          (cp >= 0x1F000 && cp <= 0x1FFFF)
+        ) {
+          w += 2;
+        } else {
+          w += 1;
+        }
+      }
+      return w;
+    };
+
+    // Build display lines with prefix
+    const rawLines: string[] = [];
+    let maxVW = 0;
     for (let i = 0; i < lineCount; i++) {
       const line = translatedLines[i] || "";
       const prefix = i === 0 ? " 🌐  " : "     ";
-      const displayLine = `${prefix}${line}  `;
-      paddedLines.push(displayLine);
-      if (displayLine.length > maxLen) {
-        maxLen = displayLine.length;
+      const displayLine = `${prefix}${line}`;
+      rawLines.push(displayLine);
+      const vw = visualWidth(displayLine);
+      if (vw > maxVW) {
+        maxVW = vw;
       }
     }
 
-    // Pad all lines to the same length for a uniform rectangle
-    const uniformLines = paddedLines.map((line) => {
-      if (line.trim() === "") {
-        return " ".repeat(maxLen);
-      }
-      return line + " ".repeat(Math.max(0, maxLen - line.length));
+    // Target visual width = longest line + 3 spaces padding
+    const targetVW = maxVW + 3;
+
+    // Pad each line with spaces so all reach the same visual width
+    const uniformLines = rawLines.map((line) => {
+      const gap = targetVW - visualWidth(line);
+      return gap > 0 ? line + " ".repeat(gap) : line;
     });
 
-    const decorations: vscode.DecorationOptions[] = [];
+    // Fixed CSS width in ch units (1ch = width of '0' in monospace = 1 ASCII col)
+    const fixedWidthCh = targetVW;
 
-    // Create per-line decorations with polished card appearance
+    const decorations: vscode.DecorationOptions[] = [];
+    // Neutral dark background matching GitLens annotation style
+    const bg = "#252526";
+
+    // Create per-line decorations – seamless block, no gaps
     for (let i = 0; i < lineCount; i++) {
       const lineNum = range.start.line + i;
       const anchorPos = new vscode.Position(lineNum, 0);
@@ -403,38 +438,40 @@ export function activate(context: vscode.ExtensionContext): void {
 
       const isTop = (i === 0);
       const isBottom = (i === lineCount - 1);
-      const radiusTL = isTop ? "6px" : "0";
-      const radiusTR = isTop ? "6px" : "0";
-      const radiusBR = isBottom ? "6px" : "0";
-      const radiusBL = isBottom ? "6px" : "0";
-      const borderTop = isTop ? "1px solid rgba(86,156,214,0.35)" : "none";
-      const borderBottom = isBottom ? "1px solid rgba(86,156,214,0.35)" : "none";
-      const borderRight = "1px solid rgba(86,156,214,0.25)";
-      // Blue accent bar on the left (like GitLens annotations)
-      const borderLeft = "3px solid #569cd6";
 
-      // Calculate transform: move up by (TotalLineCount * 100%) + 30px
+      const radiusTL = isTop ? "3px" : "0";
+      const radiusTR = isTop ? "3px" : "0";
+      const radiusBR = isBottom ? "3px" : "0";
+      const radiusBL = isBottom ? "3px" : "0";
+
+      // Subtle border only on outer edges
+      const borderTop = isTop ? "1px solid #3c3c3c" : "none";
+      const borderBottom = isBottom ? "1px solid #3c3c3c" : "none";
+      const borderLeft = "1px solid #3c3c3c";
+      const borderRight = "1px solid #3c3c3c";
+
+      // Move block above the selection
       const transformY = `calc(-1 * (${lineCount} * 100% + 30px))`;
 
       const decorationStyle =
         `border-radius: ${radiusTL} ${radiusTR} ${radiusBR} ${radiusBL}; ` +
-        `padding: 2px 12px 2px 4px; ` +
+        `padding: 0 0 0 4px; ` +
+        `width: ${fixedWidthCh}ch; ` +
         `border-top: ${borderTop}; border-bottom: ${borderBottom}; ` +
         `border-left: ${borderLeft}; border-right: ${borderRight}; ` +
         "font-style: normal; font-weight: 400; " +
-        "line-height: 1.65; font-size: inherit; font-family: inherit; " +
-        "letter-spacing: 0.2px; " +
-        "box-shadow: 0 8px 24px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.3); " +
+        "line-height: inherit; font-size: inherit; font-family: inherit; " +
         `position: absolute; display: inline-block; white-space: pre; ` +
-        `transform: translateY(${transformY}); height: 100%; box-sizing: border-box;`;
+        `transform: translateY(${transformY}); height: 100%; box-sizing: border-box; ` +
+        "margin: 0; overflow: hidden;";
 
       decorations.push({
         range: anchorRange,
         renderOptions: {
           before: {
             contentText: uniformLines[i],
-            backgroundColor: "#1c2333",
-            color: "#d4d4d4",
+            backgroundColor: bg,
+            color: "#cccccc",
             textDecoration: decorationStyle
           }
         }

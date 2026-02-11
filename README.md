@@ -38,6 +38,8 @@ Search for `Translate-selected` in the VS Code Extensions Marketplace and click 
    - **Command Palette** (`Ctrl+Shift+P` / `Cmd+Shift+P`) → type **"Translate Selected"**
 3. The translation appears as a floating overlay above the selected text
 
+![Translation Demo](images/translation-demo.png)
+
 #### Translate Input Text
 
 1. Open **Command Palette** (`Ctrl+Shift+P` / `Cmd+Shift+P`)
@@ -129,6 +131,8 @@ Chinese (Simplified), Chinese (Traditional), English, Japanese, Korean, French, 
    - **右键** → 选择 **"Translate Selected"**
    - **命令面板**（`Ctrl+Shift+P` / `Cmd+Shift+P`）→ 输入 **"Translate Selected"**
 3. 翻译结果将以浮动覆盖层显示在选中文本上方
+
+![翻译效果展示](images/translation-demo.png)
 
 #### 翻译输入文本
 
